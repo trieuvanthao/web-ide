@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: web-ide
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: IDE_PASSWORD
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
