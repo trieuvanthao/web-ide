@@ -7,6 +7,7 @@ import authRoutes, { requireAuth } from './auth.js';
 import reposRoutes from './routes/repos.js';
 import filesRoutes from './routes/files.js';
 import gitRoutes from './routes/git.js';
+import snapshotsRoutes from './routes/snapshots.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -32,6 +33,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api', requireAuth, reposRoutes);
 app.use('/api', requireAuth, filesRoutes);
 app.use('/api', requireAuth, gitRoutes);
+app.use('/api', requireAuth, snapshotsRoutes);
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 

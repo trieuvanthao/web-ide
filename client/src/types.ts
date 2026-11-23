@@ -1,3 +1,16 @@
+export interface RepoEntry {
+  name: string;
+  onServer: boolean;
+  savedAt: string | null;
+}
+
+export interface SnapshotInfo {
+  repo: string;
+  fileId: string;
+  size: number;
+  savedAt: string;
+}
+
 export interface TreeNode {
   name: string;
   path: string;

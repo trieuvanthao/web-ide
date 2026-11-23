@@ -3,17 +3,32 @@ import simpleGit from 'simple-git';
 import fs from 'node:fs';
 import path from 'node:path';
 import { REPOS_DIR, repoPath, isValidRepoName, gitErrMsg } from '../config.js';
+import { scheduleSnapshot, driveEnabled, listSnapshots } from '../snapshots.js';
 
 const router = Router();
 
-router.get('/repos', (req, res) => {
+router.get('/repos', async (req, res) => {
   try {
-    const names = fs
+    const disk = fs
       .readdirSync(REPOS_DIR, { withFileTypes: true })
       .filter((d) => d.isDirectory() && !d.name.startsWith('.') && fs.existsSync(path.join(REPOS_DIR, d.name, '.git')))
       .map((d) => d.name)
       .sort();
-    res.json({ repos: names });
+    const entries = disk.map((name) => ({ name, onServer: true, savedAt: null }));
+    if (driveEnabled()) {
+      try {
+        const snaps = await listSnapshots();
+        for (const s of snaps) {
+          if (!disk.includes(s.repo)) {
+            entries.push({ name: s.repo, onServer: false, savedAt: s.savedAt });
+          }
+        }
+      } catch (e) {
+        console.error(`[drive] list snapshots failed: ${e.message}`);
+      }
+    }
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    res.json({ repos: entries });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -39,6 +54,7 @@ router.post('/repos/clone', async (req, res) => {
     await git.remote(['set-url', 'origin', url]).catch(() => {});
     await git.addConfig('user.name', process.env.GIT_AUTHOR_NAME || 'Web IDE').catch(() => {});
     await git.addConfig('user.email', process.env.GIT_AUTHOR_EMAIL || 'web-ide@users.noreply.github.com').catch(() => {});
+    scheduleSnapshot(repoName, 5000);
     res.json({ ok: true, repo: repoName });
   } catch (e) {
     res.status(400).json({ error: gitErrMsg(e) });

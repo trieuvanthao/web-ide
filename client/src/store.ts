@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { api } from './api';
-import type { FileMeta, GitStatus, ModalState, TreeNode } from './types';
+import type { FileMeta, GitStatus, ModalState, RepoEntry, SnapshotInfo, TreeNode } from './types';
 
 export interface Tab {
   path: string;
@@ -17,7 +17,9 @@ let toastId = 0;
 
 interface Store {
   authed: boolean | null;
-  repos: string[];
+  repos: RepoEntry[];
+  driveEnabled: boolean;
+  snapshots: SnapshotInfo[];
   repo: string | null;
   tree: TreeNode[];
   treeLoading: boolean;
@@ -49,6 +51,9 @@ interface Store {
   init: () => Promise<void>;
   logout: () => Promise<void>;
   loadRepos: () => Promise<void>;
+  backupNow: (repo: string) => Promise<void>;
+  restoreSnapshot: (repo: string) => Promise<void>;
+  deleteSnapshot: (repo: string) => Promise<void>;
   openRepo: (name: string) => Promise<void>;
   closeRepo: () => void;
   clone: (url: string, token: string, name: string) => Promise<void>;
@@ -75,6 +80,8 @@ interface Store {
 export const useStore = create<Store>((set, get) => ({
   authed: null,
   repos: [],
+  driveEnabled: false,
+  snapshots: [],
   repo: null,
   tree: [],
   treeLoading: false,
@@ -127,6 +134,8 @@ export const useStore = create<Store>((set, get) => ({
     set({
       authed: false,
       repos: [],
+      snapshots: [],
+      driveEnabled: false,
       repo: null,
       tree: [],
       tabs: [],
@@ -141,10 +150,49 @@ export const useStore = create<Store>((set, get) => ({
 
   loadRepos: async () => {
     try {
-      const r = await api.repos();
-      set({ repos: r.repos });
+      const [r, s] = await Promise.all([api.repos(), api.snapshots().catch(() => ({ enabled: false, snapshots: [] }))]);
+      set({ repos: r.repos, driveEnabled: !!s.enabled, snapshots: s.snapshots });
     } catch (e: any) {
       get().toast(e.message, 'error');
+    }
+  },
+
+  backupNow: async (repo) => {
+    set({ busy: true });
+    try {
+      const r = await api.backupNow(repo);
+      get().toast(`Backed up "${repo}" to Drive (${Math.round(r.size / 1024)} KB)`, 'success');
+      await get().loadRepos();
+    } catch (e: any) {
+      get().toast(e.message, 'error');
+    } finally {
+      set({ busy: false });
+    }
+  },
+
+  restoreSnapshot: async (repo) => {
+    set({ busy: true });
+    try {
+      await api.restoreSnapshot(repo);
+      get().toast(`Restored "${repo}" from Drive`, 'success');
+      await get().loadRepos();
+    } catch (e: any) {
+      get().toast(e.message, 'error');
+    } finally {
+      set({ busy: false });
+    }
+  },
+
+  deleteSnapshot: async (repo) => {
+    set({ busy: true });
+    try {
+      await api.deleteSnapshot(repo);
+      get().toast(`Deleted Drive backup of "${repo}"`, 'success');
+      await get().loadRepos();
+    } catch (e: any) {
+      get().toast(e.message, 'error');
+    } finally {
+      set({ busy: false });
     }
   },
 

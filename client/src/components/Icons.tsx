@@ -113,6 +113,14 @@ export function SourceControlIcon({ className = '' }: { className?: string }) {
   );
 }
 
+export function CloudIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg className={className} width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+      <path d="M4.5 12.5a3 3 0 0 1-.4-5.97 4 4 0 0 1 7.8-.7 2.8 2.8 0 0 1-.4 5.67h-7z" fill="none" stroke="currentColor" strokeWidth="1.1" />
+    </svg>
+  );
+}
+
 export function UploadIcon({ className = '' }: { className?: string }) {
   return (
     <svg className={className} width="14" height="14" viewBox="0 0 16 16" fill="currentColor">

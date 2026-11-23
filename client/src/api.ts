@@ -19,9 +19,14 @@ export const api = {
   clone: (url: string, token: string, name: string) => fetch('/api/repos/clone', post({ url, token, name })).then(j),
   deleteRepo: (name: string) => fetch(`/api/repos/${enc(name)}`, { method: 'DELETE' }).then(j),
 
+  snapshots: () => fetch('/api/snapshots').then(j),
+  backupNow: (repo: string) => fetch(`/api/snapshots/${enc(repo)}`, { method: 'POST' }).then(j),
+  restoreSnapshot: (repo: string) => fetch(`/api/snapshots/${enc(repo)}/restore`, { method: 'POST' }).then(j),
+  deleteSnapshot: (repo: string) => fetch(`/api/snapshots/${enc(repo)}`, { method: 'DELETE' }).then(j),
+
   tree: (repo: string) => fetch(`/api/tree?repo=${enc(repo)}`).then(j),
   file: (repo: string, path: string) => fetch(`/api/file?repo=${enc(repo)}&path=${enc(path)}`).then(j),
-  saveFile: (repo: string, path: string, content: string) => fetch('/api/file', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ repo, path, content }) }),
+  saveFile: (repo: string, path: string, content: string) => fetch('/api/file', post({ repo, path, content })).then(j),
   createFile: (repo: string, path: string, type: 'file' | 'dir') => fetch('/api/file', post({ repo, path, type })).then(j),
   deleteFile: (repo: string, path: string) => fetch(`/api/file?repo=${enc(repo)}&path=${enc(path)}`, { method: 'DELETE' }).then(j),
   renameFile: (repo: string, path: string, newPath: string) => fetch('/api/file/rename', post({ repo, path, newPath })).then(j),

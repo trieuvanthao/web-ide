@@ -2,15 +2,30 @@ import { Router } from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
 import { repoPath, safeJoin, buildTree, isBinaryFile } from '../config.js';
+import { scheduleSnapshot, driveEnabled, restoreSnapshot } from '../snapshots.js';
 
 const router = Router();
 
 const MAX_EDIT_SIZE = 8 * 1024 * 1024;
 
-router.get('/tree', (req, res) => {
+router.get('/tree', async (req, res) => {
   try {
-    const dir = repoPath(String(req.query.repo || ''));
-    if (!fs.existsSync(dir)) return res.status(404).json({ error: 'Repo not found on server' });
+    const repoName = String(req.query.repo || '');
+    const dir = repoPath(repoName);
+    if (!fs.existsSync(dir)) {
+      if (driveEnabled()) {
+        try {
+          await restoreSnapshot(repoName);
+        } catch (e) {
+          if (String(e.message).includes('No Drive snapshot')) {
+            return res.status(404).json({ error: 'Repo not found on server' });
+          }
+          return res.status(500).json({ error: `Auto-restore from Drive failed: ${e.message}` });
+        }
+      } else {
+        return res.status(404).json({ error: 'Repo not found on server' });
+      }
+    }
     res.json({ tree: buildTree(dir) });
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -43,6 +58,7 @@ router.put('/file', (req, res) => {
     const abs = safeJoin(repoPath(String(repo)), String(rel));
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     fs.writeFileSync(abs, content ?? '', 'utf8');
+    scheduleSnapshot(String(repo), 60000);
     res.json({ ok: true });
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -60,6 +76,7 @@ router.post('/file', (req, res) => {
       fs.mkdirSync(path.dirname(abs), { recursive: true });
       fs.writeFileSync(abs, '');
     }
+    scheduleSnapshot(String(repo), 60000);
     res.json({ ok: true });
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -73,6 +90,7 @@ router.delete('/file', (req, res) => {
     const abs = safeJoin(dir, String(req.query.path || ''));
     if (abs === path.resolve(dir)) return res.status(400).json({ error: 'Cannot delete repo root' });
     fs.rmSync(abs, { recursive: true, force: true });
+    scheduleSnapshot(repo, 60000);
     res.json({ ok: true });
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -89,6 +107,7 @@ router.post('/file/rename', (req, res) => {
     if (fs.existsSync(absNew)) return res.status(409).json({ error: 'Target already exists' });
     fs.mkdirSync(path.dirname(absNew), { recursive: true });
     fs.renameSync(abs, absNew);
+    scheduleSnapshot(String(repo), 60000);
     res.json({ ok: true });
   } catch (e) {
     res.status(400).json({ error: e.message });
