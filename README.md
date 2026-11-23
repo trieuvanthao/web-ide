@@ -11,6 +11,7 @@ Trình soạn thảo code trên web, giao diện giống VS Code. Clone repo t�
 - Auto Save (bật/tắt ở status bar)
 - Git: xem thay đổi, commit, push, pull, chuyển branch
 - Ảnh xem trước được, file binary/thông báo dung lượng quá lớn
+- **Google Drive persistence** (tùy chọn): backup/restore repo tự động — Render restart/mất disk cũng không phải clone lại, kể cả file chưa commit
 
 ## Kiến trúc
 
@@ -57,6 +58,29 @@ npm start              # server phục vụ cả API + client tại http://local
 | `PORT` | Không | Mặc định 3001 |
 | `REPOS_DIR` | Không | Thư mục chứa repo clone (mặc định `server/repos`) |
 | `GIT_AUTHOR_NAME` / `GIT_AUTHOR_EMAIL` | Không | Tác giả commit mặc định |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Không | Nội dung key JSON của Service Account (xem phần Google Drive) |
+| `GOOGLE_DRIVE_FOLDER_ID` | Không | ID thư mục Drive chứa backup |
+
+## Google Drive persistence (khuyến nghị khi deploy Render)
+
+Render free mất disk khi service ngủ/redeploy. Tính năng này lưu **snapshot zip của từng repo** lên Google Drive:
+- Backup tự động: sau khi clone (5s), sau mỗi lần lưu file (60s sau lần lưu cuối), sau commit/push/pull/checkout (10s)
+- Restore tự động: mở repo mà server không còn → tải zip từ Drive về + giải nén — **giữ nguyên cả file chưa commit và branch đang bật**
+- Nút tay: hover repo → icon mây upload (backup); mục "Google Drive backups" → icon download (restore)
+
+### Cấu hình 1 lần duy nhất (~15 phút)
+
+1. Vào https://console.cloud.google.com → tạo Project (tên bất kỳ, vd `web-ide`)
+2. Menu → **APIs & Services → Library** → tìm **Google Drive API** → **Enable**
+3. Menu → **APIs & Services → Credentials** → **Create Credentials → Service account** → đặt tên → Create → Done (bỏ qua các bước phân quyền)
+4. Click vào service account vừa tạo → tab **Keys** → **Add key → Create new key → JSON** → tải file `.json` về máy
+5. Mở **Google Drive** cá nhân → tạo thư mục (vd `web-ide-backups`) → mở thư mục → copy **Folder ID** từ URL: `https://drive.google.com/drive/folders/<FOLDER_ID>` → chuột phải thư mục → **Share** → thêm email service account (dạng `xxx@web-ide.iam.gserviceaccount.com`, có trong file JSON, trường `client_email`) → cấp **Editor**
+6. Dán vào Render (hoặc env local):
+   - `GOOGLE_SERVICE_ACCOUNT_JSON` = **toàn bộ nội dung file JSON** (dán nguyên, hoặc base64 hóa file nếu bị lỗi xuống dòng)
+   - `GOOGLE_DRIVE_FOLDER_ID` = Folder ID ở bước 5
+7. Restart service → mở web → panel Repositories hiện "Google Drive backups" là thành công
+
+Xóa backup: mục "Google Drive backups" → icon thùng rác. Xóa repo khỏi server **không xóa** backup Drive (an toàn, xóa tay nếu muốn).
 
 ## Deploy lên Render (free)
 
