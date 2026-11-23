@@ -26,7 +26,7 @@ export const api = {
 
   tree: (repo: string) => fetch(`/api/tree?repo=${enc(repo)}`).then(j),
   file: (repo: string, path: string) => fetch(`/api/file?repo=${enc(repo)}&path=${enc(path)}`).then(j),
-  saveFile: (repo: string, path: string, content: string) => fetch('/api/file', post({ repo, path, content })).then(j),
+  saveFile: (repo: string, path: string, content: string) => fetch('/api/file', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ repo, path, content }) }),
   createFile: (repo: string, path: string, type: 'file' | 'dir') => fetch('/api/file', post({ repo, path, type })).then(j),
   deleteFile: (repo: string, path: string) => fetch(`/api/file?repo=${enc(repo)}&path=${enc(path)}`, { method: 'DELETE' }).then(j),
   renameFile: (repo: string, path: string, newPath: string) => fetch('/api/file/rename', post({ repo, path, newPath })).then(j),
