@@ -5,7 +5,16 @@ const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive';
 const UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
 const FILES_URL = 'https://www.googleapis.com/drive/v3/files';
 
-function getConfig() {
+function getOAuthConfig() {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+  const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+  if (!clientId || !clientSecret || !refreshToken || !folderId) return null;
+  return { clientId, clientSecret, refreshToken, folderId };
+}
+
+function getServiceAccountConfig() {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
   if (!raw || !folderId) return null;
@@ -22,7 +31,7 @@ function getConfig() {
 }
 
 export function driveEnabled() {
-  return getConfig() !== null;
+  return getOAuthConfig() !== null || getServiceAccountConfig() !== null;
 }
 
 let cachedToken = null;
@@ -32,14 +41,37 @@ function b64url(input) {
 }
 
 async function getAccessToken() {
-  const cfg = getConfig();
-  if (!cfg) throw new Error('Google Drive not configured');
   const now = Math.floor(Date.now() / 1000);
   if (cachedToken && cachedToken.expiry - 60 > now) return cachedToken.token;
+  const oauth = getOAuthConfig();
+  if (oauth) return await refreshAccessToken(oauth, now);
+  const sa = getServiceAccountConfig();
+  if (sa) return await serviceAccountAccessToken(sa, now);
+  throw new Error('Google Drive not configured');
+}
+
+async function refreshAccessToken(oauth, now) {
+  const res = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      client_id: oauth.clientId,
+      client_secret: oauth.clientSecret,
+      refresh_token: oauth.refreshToken,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error_description || 'Google token refresh failed');
+  cachedToken = { token: data.access_token, expiry: now + (data.expires_in || 3600) };
+  return cachedToken.token;
+}
+
+async function serviceAccountAccessToken(sa, now) {
   const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-  const claims = b64url(JSON.stringify({ iss: cfg.clientEmail, scope: DRIVE_SCOPE, aud: TOKEN_URL, iat: now, exp: now + 3600 }));
+  const claims = b64url(JSON.stringify({ iss: sa.clientEmail, scope: DRIVE_SCOPE, aud: TOKEN_URL, iat: now, exp: now + 3600 }));
   const input = `${header}.${claims}`;
-  const signature = crypto.createSign('RSA-SHA256').update(input).sign(cfg.privateKey);
+  const signature = crypto.createSign('RSA-SHA256').update(input).sign(sa.privateKey);
   const assertion = `${input}.${b64url(signature)}`;
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
@@ -64,13 +96,15 @@ async function driveFetch(url, options = {}) {
 
 export async function listSnapshots() {
   if (!driveEnabled()) return [];
-  const cfg = getConfig();
+  const cfg = getOAuthConfig()?.folderId || getServiceAccountConfig()?.folderId;
   const params = new URLSearchParams({
-    q: `'${cfg.folderId}' in parents and name contains 'webide-snapshot-' and trashed = false`,
+    q: `'${cfg}' in parents and name contains 'webide-snapshot-' and trashed = false`,
     fields: 'files(id,name,size,modifiedTime)',
     spaces: 'drive',
     orderBy: 'modifiedTime desc',
     pageSize: '100',
+    supportsAllDrives: 'true',
+    includeItemsFromAllDrives: 'true',
   });
   const res = await driveFetch(`${FILES_URL}?${params}`);
   const data = await res.json();
@@ -83,7 +117,7 @@ export async function listSnapshots() {
 }
 
 export async function uploadSnapshot(repoName, zipBuffer) {
-  const cfg = getConfig();
+  const cfg = getOAuthConfig() || getServiceAccountConfig();
   if (!cfg) throw new Error('Google Drive not configured');
   const boundary = 'webide' + crypto.randomBytes(16).toString('hex');
   const metadata = JSON.stringify({ name: `webide-snapshot-${repoName}.zip`, parents: [cfg.folderId] });
@@ -94,9 +128,10 @@ export async function uploadSnapshot(repoName, zipBuffer) {
     Buffer.from(`\r\n--${boundary}--`),
   ]);
   const existing = (await listSnapshots()).find((s) => s.repo === repoName);
-  const url = existing
+  const base = existing
     ? `${UPLOAD_URL}/${existing.fileId}?uploadType=multipart&fields=id`
     : `${UPLOAD_URL}?uploadType=multipart&fields=id`;
+  const url = `${base}&supportsAllDrives=true`;
   await driveFetch(url, {
     method: existing ? 'PATCH' : 'POST',
     headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
@@ -106,13 +141,13 @@ export async function uploadSnapshot(repoName, zipBuffer) {
 }
 
 export async function downloadSnapshot(fileId) {
-  const res = await driveFetch(`${FILES_URL}/${encodeURIComponent(fileId)}?alt=media`);
+  const res = await driveFetch(`${FILES_URL}/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`);
   return Buffer.from(await res.arrayBuffer());
 }
 
 export async function deleteSnapshotByRepo(repoName) {
   const existing = (await listSnapshots()).find((s) => s.repo === repoName);
   if (existing) {
-    await driveFetch(`${FILES_URL}/${existing.fileId}`, { method: 'DELETE' });
+    await driveFetch(`${FILES_URL}/${existing.fileId}?supportsAllDrives=true`, { method: 'DELETE' });
   }
 }

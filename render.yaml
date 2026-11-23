@@ -13,7 +13,13 @@ services:
         sync: false
       - key: SESSION_SECRET
         generateValue: true
-      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REFRESH_TOKEN
         sync: false
       - key: GOOGLE_DRIVE_FOLDER_ID
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
         sync: false
