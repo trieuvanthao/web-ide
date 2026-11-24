@@ -54,7 +54,7 @@ router.post('/repos/clone', async (req, res) => {
     await git.remote(['set-url', 'origin', url]).catch(() => {});
     await git.addConfig('user.name', process.env.GIT_AUTHOR_NAME || 'Web IDE').catch(() => {});
     await git.addConfig('user.email', process.env.GIT_AUTHOR_EMAIL || 'web-ide@users.noreply.github.com').catch(() => {});
-    scheduleSnapshot(repoName, 5000);
+    scheduleSnapshot(repoName, 3000);
     res.json({ ok: true, repo: repoName });
   } catch (e) {
     res.status(400).json({ error: gitErrMsg(e) });

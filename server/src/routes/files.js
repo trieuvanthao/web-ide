@@ -58,7 +58,7 @@ router.put('/file', (req, res) => {
     const abs = safeJoin(repoPath(String(repo)), String(rel));
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     fs.writeFileSync(abs, content ?? '', 'utf8');
-    scheduleSnapshot(String(repo), 60000);
+    scheduleSnapshot(String(repo), 15000);
     res.json({ ok: true });
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -76,7 +76,7 @@ router.post('/file', (req, res) => {
       fs.mkdirSync(path.dirname(abs), { recursive: true });
       fs.writeFileSync(abs, '');
     }
-    scheduleSnapshot(String(repo), 60000);
+    scheduleSnapshot(String(repo), 15000);
     res.json({ ok: true });
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -90,7 +90,7 @@ router.delete('/file', (req, res) => {
     const abs = safeJoin(dir, String(req.query.path || ''));
     if (abs === path.resolve(dir)) return res.status(400).json({ error: 'Cannot delete repo root' });
     fs.rmSync(abs, { recursive: true, force: true });
-    scheduleSnapshot(repo, 60000);
+    scheduleSnapshot(repo, 15000);
     res.json({ ok: true });
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -107,7 +107,7 @@ router.post('/file/rename', (req, res) => {
     if (fs.existsSync(absNew)) return res.status(409).json({ error: 'Target already exists' });
     fs.mkdirSync(path.dirname(absNew), { recursive: true });
     fs.renameSync(abs, absNew);
-    scheduleSnapshot(String(repo), 60000);
+    scheduleSnapshot(String(repo), 15000);
     res.json({ ok: true });
   } catch (e) {
     res.status(400).json({ error: e.message });

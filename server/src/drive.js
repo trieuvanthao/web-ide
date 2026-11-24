@@ -1,4 +1,7 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import { pipeline } from 'node:stream/promises';
+import { Readable } from 'node:stream';
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive';
@@ -94,11 +97,24 @@ async function driveFetch(url, options = {}) {
   return res;
 }
 
-export async function listSnapshots() {
+let cachedSnapshots = null;
+let snapshotsCachedAt = 0;
+const SNAPSHOTS_TTL_MS = 15000;
+
+export function invalidateSnapshotsCache() {
+  cachedSnapshots = null;
+  snapshotsCachedAt = 0;
+}
+
+export async function listSnapshots(forceRefresh = false) {
   if (!driveEnabled()) return [];
-  const cfg = getOAuthConfig()?.folderId || getServiceAccountConfig()?.folderId;
+  const now = Date.now();
+  if (!forceRefresh && cachedSnapshots && now - snapshotsCachedAt < SNAPSHOTS_TTL_MS) {
+    return cachedSnapshots;
+  }
+  const folderId = getOAuthConfig()?.folderId || getServiceAccountConfig()?.folderId;
   const params = new URLSearchParams({
-    q: `'${cfg}' in parents and name contains 'webide-snapshot-' and trashed = false`,
+    q: `'${folderId}' in parents and name contains 'webide-snapshot-' and trashed = false`,
     fields: 'files(id,name,size,modifiedTime)',
     spaces: 'drive',
     orderBy: 'modifiedTime desc',
@@ -108,36 +124,95 @@ export async function listSnapshots() {
   });
   const res = await driveFetch(`${FILES_URL}?${params}`);
   const data = await res.json();
-  return (data.files || []).map((f) => ({
+  cachedSnapshots = (data.files || []).map((f) => ({
     repo: f.name.replace(/^webide-snapshot-/, '').replace(/\.zip$/, ''),
     fileId: f.id,
     size: Number(f.size || 0),
     savedAt: f.modifiedTime,
   }));
+  snapshotsCachedAt = Date.now();
+  return cachedSnapshots;
 }
 
-export async function uploadSnapshot(repoName, zipBuffer) {
+/**
+ * Upload snapshot file using Google Drive Resumable Upload (Streaming).
+ * Handles both a file path (string) or Buffer, streaming from disk when path is provided
+ * to keep Node.js heap memory under 20MB.
+ */
+export async function uploadSnapshot(repoName, filePathOrBuffer) {
   const cfg = getOAuthConfig() || getServiceAccountConfig();
   if (!cfg) throw new Error('Google Drive not configured');
-  const boundary = 'webide' + crypto.randomBytes(16).toString('hex');
-  const metadata = JSON.stringify({ name: `webide-snapshot-${repoName}.zip`, parents: [cfg.folderId] });
-  const body = Buffer.concat([
-    Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n`),
-    Buffer.from(`--${boundary}\r\nContent-Type: application/zip\r\n\r\n`),
-    zipBuffer,
-    Buffer.from(`\r\n--${boundary}--`),
-  ]);
-  const existing = (await listSnapshots()).find((s) => s.repo === repoName);
-  const base = existing
-    ? `${UPLOAD_URL}/${existing.fileId}?uploadType=multipart&fields=id`
-    : `${UPLOAD_URL}?uploadType=multipart&fields=id`;
-  const url = `${base}&supportsAllDrives=true`;
-  await driveFetch(url, {
+
+  const existingList = await listSnapshots(true);
+  const existing = existingList.find((s) => s.repo === repoName);
+  const fileName = `webide-snapshot-${repoName}.zip`;
+
+  const isPath = typeof filePathOrBuffer === 'string';
+  const fileSize = isPath ? fs.statSync(filePathOrBuffer).size : filePathOrBuffer.length;
+
+  // Step 1: Initiate Resumable Upload Session
+  const initUrl = existing
+    ? `${UPLOAD_URL}/${existing.fileId}?uploadType=resumable&supportsAllDrives=true`
+    : `${UPLOAD_URL}?uploadType=resumable&supportsAllDrives=true`;
+
+  const metadata = existing
+    ? { name: fileName }
+    : { name: fileName, parents: [cfg.folderId] };
+
+  const token = await getAccessToken();
+  const initRes = await fetch(initUrl, {
     method: existing ? 'PATCH' : 'POST',
-    headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
-    body,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json; charset=UTF-8',
+      'X-Upload-Content-Type': 'application/zip',
+      'X-Upload-Content-Length': String(fileSize),
+    },
+    body: JSON.stringify(metadata),
   });
+
+  if (!initRes.ok) {
+    const errText = await initRes.text().catch(() => '');
+    throw new Error(`Google Drive resumable init failed (${initRes.status}): ${errText.slice(0, 300)}`);
+  }
+
+  const sessionUri = initRes.headers.get('location');
+  if (!sessionUri) throw new Error('Google Drive did not return resumable upload session URI');
+
+  // Step 2: Stream content directly to the session URI
+  const uploadBody = isPath
+    ? Readable.toWeb(fs.createReadStream(filePathOrBuffer))
+    : filePathOrBuffer;
+
+  const uploadRes = await fetch(sessionUri, {
+    method: 'PUT',
+    headers: {
+      'Content-Length': String(fileSize),
+      'Content-Type': 'application/zip',
+    },
+    body: uploadBody,
+    duplex: 'half',
+  });
+
+  if (!uploadRes.ok) {
+    const errText = await uploadRes.text().catch(() => '');
+    throw new Error(`Google Drive stream upload failed (${uploadRes.status}): ${errText.slice(0, 300)}`);
+  }
+
+  invalidateSnapshotsCache();
   return true;
+}
+
+/**
+ * Stream snapshot directly from Google Drive to a destination file on disk.
+ * Avoids buffering entire zip into Node.js heap memory.
+ */
+export async function downloadSnapshotToFile(fileId, destFilePath) {
+  const res = await driveFetch(`${FILES_URL}/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`);
+  if (!res.body) throw new Error('Empty response body from Google Drive');
+  const fileStream = fs.createWriteStream(destFilePath);
+  await pipeline(Readable.fromWeb(res.body), fileStream);
+  return destFilePath;
 }
 
 export async function downloadSnapshot(fileId) {
@@ -146,8 +221,10 @@ export async function downloadSnapshot(fileId) {
 }
 
 export async function deleteSnapshotByRepo(repoName) {
-  const existing = (await listSnapshots()).find((s) => s.repo === repoName);
+  const existingList = await listSnapshots(true);
+  const existing = existingList.find((s) => s.repo === repoName);
   if (existing) {
     await driveFetch(`${FILES_URL}/${existing.fileId}?supportsAllDrives=true`, { method: 'DELETE' });
+    invalidateSnapshotsCache();
   }
 }

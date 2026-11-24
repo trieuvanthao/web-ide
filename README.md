@@ -64,8 +64,9 @@ npm start              # server phục vụ cả API + client tại http://local
 ## Google Drive persistence (khuyến nghị khi deploy Render)
 
 Render free mất disk khi service ngủ/redeploy. Tính năng này lưu **snapshot zip của từng repo** lên Google Drive:
-- Backup tự động: sau khi clone (5s), sau mỗi lần lưu file (60s sau lần lưu cuối), sau commit/push/pull/checkout (10s)
-- Restore tự động: mở repo mà server không còn → tải zip từ Drive về + giải nén — **giữ nguyên cả file chưa commit và branch đang bật**
+- Backup tự động: sau khi clone (3s), sau mỗi lần lưu file (15s sau lần lưu cuối), sau commit/push/pull/checkout (3s), và tự động flush snapshot trước khi server shutdown/sleep (SIGTERM)
+- Tối ưu RAM (Memory-friendly): Stream file trực tiếp từ disk lên Drive qua Resumable Upload, tự động loại trừ các thư mục nặng (`node_modules`, `dist`, `.next`, cache...) giúp tránh lỗi tràn RAM 512MB (OOM) trên Render
+- Restore tự động: mở repo mà server không còn → tải stream zip từ Drive về + giải nén — **giữ nguyên cả file chưa commit và branch đang bật**
 - Nút tay: hover repo → icon mây upload (backup); mục "Google Drive backups" → icon download (restore)
 
 ### Cấu hình 1 lần duy nhất (~15 phút)

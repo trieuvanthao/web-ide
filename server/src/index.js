@@ -8,6 +8,7 @@ import reposRoutes from './routes/repos.js';
 import filesRoutes from './routes/files.js';
 import gitRoutes from './routes/git.js';
 import snapshotsRoutes from './routes/snapshots.js';
+import { flushPendingSnapshots } from './snapshots.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -54,7 +55,30 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message || 'Internal error' });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   const auth = process.env.IDE_PASSWORD ? 'password protected' : 'NO PASSWORD SET (open access)';
   console.log(`Web IDE server on http://localhost:${PORT} [${auth}]`);
 });
+
+let isShuttingDown = false;
+async function handleShutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.log(`[server] Received ${signal}. Flushing pending snapshots before exit...`);
+  try {
+    await Promise.race([
+      flushPendingSnapshots(),
+      new Promise((resolve) => setTimeout(resolve, 20000)),
+    ]);
+  } catch (err) {
+    console.error('[server] Error flushing snapshots on shutdown:', err.message);
+  }
+  server.close(() => {
+    console.log('[server] Closed HTTP server. Bye.');
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(0), 2000);
+}
+
+process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+process.on('SIGINT', () => handleShutdown('SIGINT'));

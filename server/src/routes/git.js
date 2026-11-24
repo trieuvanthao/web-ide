@@ -55,7 +55,7 @@ router.post('/git/commit', async (req, res) => {
       await git.add('-A');
     }
     const r = await git.commit(String(message).trim());
-    scheduleSnapshot(String(repo), 10000);
+    scheduleSnapshot(String(repo), 3000);
     res.json({ ok: true, commit: r.commit });
   } catch (e) {
     res.status(400).json({ error: gitErrMsg(e) });
@@ -71,7 +71,7 @@ router.post('/git/push', async (req, res) => {
     const s = await git.status();
     if (!s.current) return res.status(400).json({ error: 'Detached HEAD, cannot push' });
     await git.push(withToken(origin, token), s.current);
-    scheduleSnapshot(String(repo), 10000);
+    scheduleSnapshot(String(repo), 3000);
     res.json({ ok: true, branch: s.current });
   } catch (e) {
     res.status(400).json({ error: gitErrMsg(e) });
@@ -87,7 +87,7 @@ router.post('/git/pull', async (req, res) => {
     const s = await git.status();
     if (!s.current) return res.status(400).json({ error: 'Detached HEAD, cannot pull' });
     const out = await git.pull(withToken(origin, token), s.current);
-    scheduleSnapshot(String(repo), 10000);
+    scheduleSnapshot(String(repo), 3000);
     res.json({ ok: true, branch: s.current, files: out?.files?.length ?? 0 });
   } catch (e) {
     res.status(400).json({ error: gitErrMsg(e) });
@@ -115,7 +115,7 @@ router.post('/git/checkout', async (req, res) => {
     } else {
       await git.checkout(branch);
     }
-    scheduleSnapshot(String(repo), 10000);
+    scheduleSnapshot(String(repo), 3000);
     res.json({ ok: true });
   } catch (e) {
     res.status(400).json({ error: gitErrMsg(e) });
