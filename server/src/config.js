@@ -52,8 +52,25 @@ export function isBinaryFile(buf) {
 }
 
 export function gitErrMsg(err) {
-  const msg = String(err?.message || err);
+  let msg = String(err?.message || err);
+  // Mask sensitive tokens in URLs
+  msg = msg.replace(/https:\/\/[^@\s]+@/g, 'https://***@');
+
   const lines = msg.split('\n').map((s) => s.trim()).filter(Boolean);
-  const last = lines[lines.length - 1] || 'Git error';
-  return last.length > 400 ? last.slice(0, 400) : last;
+  if (!lines.length) return 'Git error';
+
+  // Extract meaningful error lines (rejections, errors, fatals, hints, remote notices)
+  const importantLines = lines.filter((l) =>
+    /(^!\s|\bfatal:|\berror:|\bremote:|\bhint:)/i.test(l) &&
+    !l.startsWith('git ') &&
+    !l.startsWith('GitError:')
+  );
+
+  if (importantLines.length > 0) {
+    const combined = importantLines.join('\n');
+    return combined.length > 600 ? combined.slice(0, 600) + '...' : combined;
+  }
+
+  const tail = lines.slice(-2).join('\n');
+  return tail.length > 600 ? tail.slice(0, 600) + '...' : tail;
 }
