@@ -14,11 +14,12 @@ export default function GitPanel() {
   const pull = useStore((s) => s.pull);
   const switchBranch = useStore((s) => s.switchBranch);
   const [message, setMessage] = useState('');
-  const [tokenInput, setTokenInput] = useState('');
+  const [tokenInput, setTokenInput] = useState(token || '');
   const [showToken, setShowToken] = useState(!token);
 
   useEffect(() => {
     setShowToken(!token);
+    if (token) setTokenInput(token);
   }, [token]);
 
   if (!gitStatus) {
@@ -112,7 +113,7 @@ export default function GitPanel() {
 
       <div className="px-3 py-2 border-b border-vsc-border">
         <button onClick={() => setShowToken((v) => !v)} className="text-xs text-vsc-dim hover:text-vsc-text">
-          {showToken ? '▾' : '▸'} GitHub token {token ? '(saved in memory ✓)' : '(required for pull/push)'}
+          {showToken ? '▾' : '▸'} GitHub token {token ? '(active & synced with Terminal ✓)' : '(required for pull/push/terminal)'}
         </button>
         {showToken && (
           <div className="flex gap-1 mt-2">
@@ -120,13 +121,15 @@ export default function GitPanel() {
               type="password"
               value={tokenInput}
               onChange={(e) => setTokenInput(e.target.value)}
-              placeholder="ghp_… (scope: repo)"
+              placeholder="ghp_… (scope: repo, workflow)"
               className="flex-1 bg-vsc-bg border border-vsc-border rounded px-2 py-1 text-xs text-vsc-text outline-none focus:border-vsc-accent"
             />
             <button
               onClick={() => {
-                setToken(tokenInput.trim() || null);
-                if (tokenInput.trim()) useStore.getState().toast('Token saved (memory only)', 'success');
+                const clean = tokenInput.trim();
+                setToken(clean || null);
+                if (clean) useStore.getState().toast('GitHub token saved & synced with Git and Terminal!', 'success');
+                else useStore.getState().toast('GitHub token cleared', 'info');
               }}
               className="bg-vsc-accent hover:bg-vsc-accent-hover text-white text-xs rounded px-2"
             >

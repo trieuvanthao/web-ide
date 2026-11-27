@@ -7,7 +7,8 @@ const router = Router();
 
 function withToken(url, token) {
   if (!token) return url;
-  return url.replace(/^https:\/\//, `https://x-access-token:${encodeURIComponent(token)}@`);
+  const clean = url.replace(/https:\/\/[^@\s]+@/, 'https://');
+  return clean.replace(/^https:\/\//, `https://x-access-token:${encodeURIComponent(token)}@`);
 }
 
 async function getGit(repoName) {
@@ -20,6 +21,25 @@ async function getOriginUrl(git) {
   const origin = remotes.find((r) => r.name === 'origin');
   return origin?.refs?.fetch || origin?.refs?.push || null;
 }
+
+router.post('/git/token', async (req, res) => {
+  try {
+    const { repo, token } = req.body || {};
+    if (!repo) return res.status(400).json({ error: 'Repo required' });
+    const git = await getGit(repo);
+    const origin = await getOriginUrl(git);
+    if (origin) {
+      const clean = origin.replace(/https:\/\/[^@\s]+@/, 'https://');
+      const targetUrl = token
+        ? clean.replace(/^https:\/\//, `https://x-access-token:${encodeURIComponent(token)}@`)
+        : clean;
+      await git.remote(['set-url', 'origin', targetUrl]);
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: gitErrMsg(e) });
+  }
+});
 
 router.get('/git/status', async (req, res) => {
   try {

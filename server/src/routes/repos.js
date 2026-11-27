@@ -51,7 +51,11 @@ router.post('/repos/clone', async (req, res) => {
     const authUrl = token ? url.replace(/^https:\/\//, `https://x-access-token:${encodeURIComponent(token)}@`) : url;
     await simpleGit().clone(authUrl, dest);
     const git = simpleGit(dest);
-    await git.remote(['set-url', 'origin', url]).catch(() => {});
+    if (token) {
+      await git.remote(['set-url', 'origin', authUrl]).catch(() => {});
+    } else {
+      await git.remote(['set-url', 'origin', url]).catch(() => {});
+    }
     await git.addConfig('user.name', process.env.GIT_AUTHOR_NAME || 'Web IDE').catch(() => {});
     await git.addConfig('user.email', process.env.GIT_AUTHOR_EMAIL || 'web-ide@users.noreply.github.com').catch(() => {});
     scheduleSnapshot(repoName, 3000);

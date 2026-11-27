@@ -37,4 +37,5 @@ export const api = {
   push: (repo: string, token: string) => fetch('/api/git/push', post({ repo, token })).then(j),
   pull: (repo: string, token: string) => fetch('/api/git/pull', post({ repo, token })).then(j),
   checkout: (repo: string, branch: string) => fetch('/api/git/checkout', post({ repo, branch })).then(j),
+  setGitToken: (repo: string, token: string) => fetch('/api/git/token', post({ repo, token })).then(j),
 };

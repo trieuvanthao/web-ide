@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { URL } from 'node:url';
+import simpleGit from 'simple-git';
 import { REPOS_DIR, repoPath, isValidRepoName } from './config.js';
 
 let nodePty = null;
@@ -87,20 +88,47 @@ export function initTerminalWebSocket(server) {
     }
   });
 
-  wss.on('connection', (ws, req) => {
+  wss.on('connection', async (ws, req) => {
     const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const repoParam = parsedUrl.searchParams.get('repo');
+    const tokenParam = parsedUrl.searchParams.get('token');
 
     let cwd = REPOS_DIR;
     if (repoParam && isValidRepoName(repoParam)) {
       try {
         const p = repoPath(repoParam);
-        if (fs.existsSync(p)) cwd = p;
+        if (fs.existsSync(p)) {
+          cwd = p;
+          if (tokenParam) {
+            try {
+              const git = simpleGit(cwd);
+              const remotes = await git.getRemotes(true);
+              const origin = remotes.find((r) => r.name === 'origin');
+              if (origin) {
+                const currentUrl = origin.refs.fetch || origin.refs.push || '';
+                if (!currentUrl.includes(tokenParam)) {
+                  const clean = currentUrl.replace(/https:\/\/[^@\s]+@/, 'https://');
+                  const targetUrl = clean.replace(/^https:\/\//, `https://x-access-token:${encodeURIComponent(tokenParam)}@`);
+                  await git.remote(['set-url', 'origin', targetUrl]);
+                }
+              }
+            } catch (err) {
+              console.warn('[terminal] Could not set git origin token:', err.message);
+            }
+          }
+        }
       } catch {}
     }
 
     const { shell, args } = getDefaultShell();
-    console.log(`[terminal] Spawning shell "${shell}" in "${cwd}"`);
+    console.log(`[terminal] Spawning shell "${shell}" in "${cwd}" (token: ${tokenParam ? 'yes' : 'no'})`);
+
+    const termEnv = {
+      ...process.env,
+      TERM: 'xterm-256color',
+      COLORTERM: 'truecolor',
+      ...(tokenParam ? { GITHUB_TOKEN: tokenParam, GH_TOKEN: tokenParam } : {}),
+    };
 
     let term = null;
     const isPty = nodePty !== null;
@@ -112,11 +140,7 @@ export function initTerminalWebSocket(server) {
           cols: 80,
           rows: 24,
           cwd,
-          env: {
-            ...process.env,
-            TERM: 'xterm-256color',
-            COLORTERM: 'truecolor',
-          },
+          env: termEnv,
         });
 
         term.onData((data) => {
@@ -141,11 +165,7 @@ export function initTerminalWebSocket(server) {
       try {
         term = spawn(shell, args, {
           cwd,
-          env: {
-            ...process.env,
-            TERM: 'xterm-256color',
-            COLORTERM: 'truecolor',
-          },
+          env: termEnv,
           stdio: ['pipe', 'pipe', 'pipe'],
         });
 

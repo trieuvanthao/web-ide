@@ -97,7 +97,7 @@ export const useStore = create<Store>((set, get) => ({
   contents: {},
   metas: {},
   expanded: new Set(),
-  token: null,
+  token: typeof window !== 'undefined' ? localStorage.getItem('webide_github_token') || null : null,
   gitStatus: null,
   branches: null,
   autoSave: false,
@@ -114,7 +114,18 @@ export const useStore = create<Store>((set, get) => ({
 
   setAuthed: (v) => set({ authed: v }),
   setView: (v) => set({ view: v }),
-  setToken: (t) => set({ token: t }),
+  setToken: (t) => {
+    if (t) {
+      localStorage.setItem('webide_github_token', t);
+    } else {
+      localStorage.removeItem('webide_github_token');
+    }
+    set({ token: t });
+    const repo = get().repo;
+    if (repo && t) {
+      api.setGitToken(repo, t).catch(() => {});
+    }
+  },
   toggleAutoSave: () => set((s) => ({ autoSave: !s.autoSave })),
 
   toast: (msg, type = 'info') => {
@@ -210,6 +221,10 @@ export const useStore = create<Store>((set, get) => ({
 
   openRepo: async (name) => {
     set({ repo: name, tree: [], treeLoading: true, view: 'explorer', tabs: [], active: null, contents: {}, metas: {}, gitStatus: null, branches: null });
+    const token = get().token;
+    if (token) {
+      api.setGitToken(name, token).catch(() => {});
+    }
     await get().refreshTree();
     await get().refreshGit();
     set((s) => {

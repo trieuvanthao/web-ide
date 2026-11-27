@@ -7,6 +7,7 @@ import { CloseIcon, MaximizeIcon, MinimizeIcon, RefreshIcon, TerminalIcon, Trash
 
 export default function TerminalPane() {
   const repo = useStore((s) => s.repo);
+  const token = useStore((s) => s.token);
   const terminalHeight = useStore((s) => s.terminalHeight);
   const setTerminalHeight = useStore((s) => s.setTerminalHeight);
   const setTerminalOpen = useStore((s) => s.setTerminalOpen);
@@ -69,7 +70,7 @@ export default function TerminalPane() {
 
     // Connect WebSocket
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/api/terminal?repo=${encodeURIComponent(repo || '')}`;
+    const wsUrl = `${protocol}//${window.location.host}/api/terminal?repo=${encodeURIComponent(repo || '')}&token=${encodeURIComponent(token || '')}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -134,7 +135,7 @@ export default function TerminalPane() {
       fitAddonRef.current = null;
       wsRef.current = null;
     };
-  }, [repo]);
+  }, [repo, token]);
 
   // Handle reconnect
   const handleReconnect = () => {
@@ -149,7 +150,7 @@ export default function TerminalPane() {
     }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/api/terminal?repo=${encodeURIComponent(repo || '')}`;
+    const wsUrl = `${protocol}//${window.location.host}/api/terminal?repo=${encodeURIComponent(repo || '')}&token=${encodeURIComponent(token || '')}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
