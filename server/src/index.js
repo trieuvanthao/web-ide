@@ -9,6 +9,7 @@ import filesRoutes from './routes/files.js';
 import gitRoutes from './routes/git.js';
 import snapshotsRoutes from './routes/snapshots.js';
 import { flushPendingSnapshots } from './snapshots.js';
+import { initTerminalWebSocket } from './terminal.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -59,6 +60,8 @@ const server = app.listen(PORT, () => {
   const auth = process.env.IDE_PASSWORD ? 'password protected' : 'NO PASSWORD SET (open access)';
   console.log(`Web IDE server on http://localhost:${PORT} [${auth}]`);
 });
+
+initTerminalWebSocket(server);
 
 let isShuttingDown = false;
 async function handleShutdown(signal) {

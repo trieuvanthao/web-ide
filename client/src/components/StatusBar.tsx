@@ -6,6 +6,7 @@ export default function StatusBar() {
   const autoSave = useStore((s) => s.autoSave);
   const toggleAutoSave = useStore((s) => s.toggleAutoSave);
   const dirtyCount = useStore((s) => s.tabs.filter((t) => t.dirty).length);
+  const toggleTerminal = useStore((s) => s.toggleTerminal);
   const logout = useStore((s) => s.logout);
 
   const unsavedChanges = gitStatus
@@ -22,6 +23,9 @@ export default function StatusBar() {
         {unsavedChanges > 0 && <span>⚠ {unsavedChanges} changed (not committed)</span>}
       </div>
       <div className="flex items-center gap-3">
+        <button onClick={toggleTerminal} className="hover:underline flex items-center gap-1" title="Toggle Terminal (Ctrl+`)">
+          <span>&gt;_ Terminal</span>
+        </button>
         {dirtyCount > 0 && <span>{dirtyCount} unsaved</span>}
         <button onClick={toggleAutoSave} className="hover:underline">
           Auto Save: {autoSave ? 'On' : 'Off'}

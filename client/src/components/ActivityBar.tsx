@@ -1,4 +1,4 @@
-import { ExplorerIcon, RepoIcon, SourceControlIcon } from './Icons';
+import { ExplorerIcon, RepoIcon, SourceControlIcon, TerminalIcon } from './Icons';
 import { useStore } from '../store';
 
 export default function ActivityBar() {
@@ -6,6 +6,8 @@ export default function ActivityBar() {
   const setView = useStore((s) => s.setView);
   const repo = useStore((s) => s.repo);
   const gitStatus = useStore((s) => s.gitStatus);
+  const terminalOpen = useStore((s) => s.terminalOpen);
+  const toggleTerminal = useStore((s) => s.toggleTerminal);
   const changeCount = gitStatus
     ? gitStatus.created.length + gitStatus.modified.length + gitStatus.deleted.length + gitStatus.renamed.length + gitStatus.conflicted.length
     : 0;
@@ -30,6 +32,15 @@ export default function ActivityBar() {
             {changeCount}
           </span>
         )}
+      </button>
+      <button
+        title="Terminal (Ctrl+`)"
+        className={`relative w-12 h-12 flex items-center justify-center cursor-pointer border-l-2 ${
+          terminalOpen ? 'text-white border-white' : 'text-vsc-dim border-transparent hover:text-vsc-text'
+        }`}
+        onClick={toggleTerminal}
+      >
+        <TerminalIcon className="w-5 h-5" />
       </button>
     </div>
   );

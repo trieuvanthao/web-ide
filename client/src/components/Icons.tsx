@@ -204,3 +204,27 @@ export function iconColorFor(fileName: string): string {
 }
 
 export const imageExts = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp']);
+
+export function TerminalIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg className={className} width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+      <path d="M2 3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H2zm0 1h12v8H2V4zm2 2l2.5 2L4 10h1.5l2.5-2-2.5-2H4zm5 3h3v1H9v-1z" />
+    </svg>
+  );
+}
+
+export function MaximizeIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+      <rect x="2.5" y="2.5" width="11" height="11" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
+  );
+}
+
+export function MinimizeIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+      <path d="M3 13h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}

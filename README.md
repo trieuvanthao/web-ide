@@ -10,6 +10,7 @@ Trình soạn thảo code trên web, giao diện giống VS Code. Clone repo t�
 - Editor Monaco (cùng engine VS Code), nhiều tab, Ctrl+S lưu
 - Auto Save (bật/tắt ở status bar)
 - Git: xem thay đổi, commit, push, pull, chuyển branch
+- **Integrated Terminal (xterm.js)**: Terminal trực tiếp trên web giống VS Code thật (phím tắt `Ctrl + \``, nút Terminal trên ActivityBar/StatusBar), hỗ trợ chạy lệnh Git, npm, shell tương tác thời gian thực
 - Ảnh xem trước được, file binary/thông báo dung lượng quá lớn
 - **Google Drive persistence** (tùy chọn): backup/restore repo tự động — Render restart/mất disk cũng không phải clone lại, kể cả file chưa commit
 

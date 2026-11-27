@@ -37,6 +37,12 @@ interface Store {
   contextMenu: { x: number; y: number; path: string; type: 'file' | 'dir' } | null;
   modal: ModalState | null;
   busy: boolean;
+  terminalOpen: boolean;
+  terminalHeight: number;
+
+  toggleTerminal: () => void;
+  setTerminalOpen: (open: boolean) => void;
+  setTerminalHeight: (h: number) => void;
 
   setAuthed: (v: boolean) => void;
   setView: (v: Store['view']) => void;
@@ -99,6 +105,12 @@ export const useStore = create<Store>((set, get) => ({
   contextMenu: null,
   modal: null,
   busy: false,
+  terminalOpen: false,
+  terminalHeight: 240,
+
+  toggleTerminal: () => set((s) => ({ terminalOpen: !s.terminalOpen })),
+  setTerminalOpen: (open) => set({ terminalOpen: open }),
+  setTerminalHeight: (h) => set({ terminalHeight: Math.max(120, Math.min(h, window.innerHeight * 0.8)) }),
 
   setAuthed: (v) => set({ authed: v }),
   setView: (v) => set({ view: v }),

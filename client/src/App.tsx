@@ -7,6 +7,7 @@ import ReposScreen from './components/ReposScreen';
 import GitPanel from './components/GitPanel';
 import Tabs from './components/Tabs';
 import EditorPane from './components/EditorPane';
+import TerminalPane from './components/TerminalPane';
 import StatusBar from './components/StatusBar';
 import ContextMenu from './components/ContextMenu';
 import InputModal from './components/InputModal';
@@ -18,6 +19,8 @@ export default function App() {
   const view = useStore((s) => s.view);
   const repo = useStore((s) => s.repo);
   const saveFile = useStore((s) => s.saveFile);
+  const terminalOpen = useStore((s) => s.terminalOpen);
+  const toggleTerminal = useStore((s) => s.toggleTerminal);
 
   useEffect(() => {
     void init();
@@ -29,10 +32,14 @@ export default function App() {
         e.preventDefault();
         void saveFile();
       }
+      if ((e.ctrlKey || e.metaKey) && (e.key === '`' || e.key === '~')) {
+        e.preventDefault();
+        toggleTerminal();
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [saveFile]);
+  }, [saveFile, toggleTerminal]);
 
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -64,9 +71,10 @@ export default function App() {
           {view === 'explorer' && (repo ? <Explorer /> : <EmptySidebar />)}
           {view === 'git' && (repo ? <GitPanel /> : <EmptySidebar />)}
         </aside>
-        <main className="flex flex-col flex-1 min-w-0">
+        <main className="flex flex-col flex-1 min-w-0 relative">
           <Tabs />
           <EditorPane />
+          {terminalOpen && <TerminalPane />}
         </main>
       </div>
       <StatusBar />
